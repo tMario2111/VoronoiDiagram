@@ -4,7 +4,7 @@ App::App()
 {
     this->setupWin();
     this->setupGui();
-    voronoi = std::make_unique<Voronoi>(this->win);
+    voronoi = std::make_unique<Voronoi>(this->win, this->use_gpu);
 
     this->run();
 }
@@ -29,6 +29,7 @@ void App::winEvents()
     this->dt = this->win_clock.restart();
     for (sf::Event event{}; win.pollEvent(event);)
     {
+        ImGui::SFML::ProcessEvent(event);
         switch (event.type)
         {
         case sf::Event::Closed:
@@ -38,12 +39,24 @@ void App::winEvents()
             if (event.key.code == sf::Keyboard::R)
             {
                 voronoi.release();
-                voronoi = std::make_unique<Voronoi>(this->win);
+                voronoi = std::make_unique<Voronoi>(this->win, this->use_gpu);
+                this->dt = this->win_clock.restart();
             }
             break;
         default:
             break;
         }
+    }
+}
+
+void App::updateGui()
+{
+    ImGui::Begin("Settings");
+
+    if (ImGui::Checkbox("Use GPU", &this->use_gpu))
+    {
+        voronoi.release();
+        voronoi = std::make_unique<Voronoi>(this->win, this->use_gpu);
     }
 }
 
@@ -54,7 +67,9 @@ void App::run()
         this->winEvents();
 
         ImGui::SFML::Update(win, dt);
-        this->voronoi->update();
+        this->updateGui();
+        this->voronoi->update(this->dt);
+        ImGui::End();
 
         this->win.clear();
         this->voronoi->render();

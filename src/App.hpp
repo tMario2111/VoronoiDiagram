@@ -21,10 +21,13 @@ private:
 
     sf::Clock win_clock;
     sf::Time dt;
+
+    bool use_gpu = true;
     
     void setupWin();
     void setupGui();
     
     void winEvents();
+    void updateGui();
     void run();
 };
