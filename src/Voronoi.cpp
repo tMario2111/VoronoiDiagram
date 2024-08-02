@@ -1,8 +1,9 @@
 #include "Voronoi.hpp"
 
-Voronoi::Voronoi(sf::RenderWindow& win, bool use_gpu) :
+Voronoi::Voronoi(sf::RenderWindow& win, bool use_gpu, DistanceType distance_type) :
     win{ win },
-    use_gpu{ use_gpu }
+    use_gpu{ use_gpu },
+    distance_type{ distance_type }
 {
     thread_count = std::thread::hardware_concurrency();
     threads.resize(thread_count);
@@ -27,6 +28,16 @@ Voronoi::~Voronoi()
 float Voronoi::squaredDistance(const sf::Vector2f a, const sf::Vector2f b)
 {
     return (b.x - a.x) * (b.x - a.x) + (b.y - a.y) * (b.y - a.y);
+}
+
+float Voronoi::manhattanDistance(const sf::Vector2f a, const sf::Vector2f b)
+{
+    return std::fabsf(a.x - b.x) + std::fabsf(a.y - b.y);
+}
+
+float Voronoi::chebyshevDistance(const sf::Vector2f a, const sf::Vector2f b)
+{
+    return std::max(std::fabsf(a.x - b.x), std::fabsf(a.y - b.y));
 }
 
 void Voronoi::setupRandom()
@@ -100,7 +111,16 @@ void Voronoi::processVoronoiCPU(unsigned int c_thread)
             min_distance = INFINITY;
             for (const auto& point : this->points)
             {
-                distance = squaredDistance(this->map_vertices[k].position, static_cast<sf::Vector2f>(point.position));
+                if (distance_type == DistanceType::Euclidean)
+                    distance = this->squaredDistance(
+                        this->map_vertices[k].position, static_cast<sf::Vector2f>(point.position));
+                else if (distance_type == DistanceType::Manhattan)
+                    distance = this->manhattanDistance(
+                        this->map_vertices[k].position, static_cast<sf::Vector2f>(point.position));
+                else if (distance_type == DistanceType::Chebyshev)
+                    distance = this->chebyshevDistance(
+                        this->map_vertices[k].position, static_cast<sf::Vector2f>(point.position));
+
                 if (distance < min_distance)
                 {
                     min_distance = distance;
@@ -135,6 +155,7 @@ void Voronoi::setupMapGPU()
 
     this->shader.setUniformArray("u_point_position", point_position, POINT_COUNT);
     this->shader.setUniformArray("u_point_color", point_color, POINT_COUNT);
+    this->shader.setUniform("u_distance_type", static_cast<int>(this->distance_type));
 
     this->sprite.setTexture(this->render_texture.getTexture());
     this->present_texture.create(this->win.getSize().x, this->win.getSize().y);
@@ -157,20 +178,31 @@ void Voronoi::update(sf::Time dt)
             }
         }
         if (ok)
+        {
+            if (!this->time_set)
+            {
+                this->render_time = this->render_clock.getElapsedTime();
+                this->time_set = true;
+            }
             ImGui::Text("%s", 
-                std::string{ "Rendering took: " + std::to_string(this->render_time.asSeconds()) + " seconds" }.c_str());
-        else
-            this->render_time += dt;
+                std::string{ "Rendering took: " + std::to_string(this->render_time.asSeconds()) 
+                    + " seconds" }.c_str());
+        }
     }
     else
     {
+        if (!this->time_set)
+        {
+            this->render_time = this->render_clock.getElapsedTime();
+            this->time_set = true;
+        }
         ImGui::Text("%s", std::string{ "Running on GPU" }.c_str());
-        if (this->render_time == sf::Time::Zero)
-            this->render_time = dt;
-                    ImGui::Text("%s", 
-                std::string{ "Rendering took: " + std::to_string(this->render_time.asSeconds()) + " seconds" }.c_str());
-
+        ImGui::Text("%s", 
+            std::string{ "Rendering took: " + std::to_string(this->render_time.asSeconds()) 
+            + " seconds" }.c_str());
     }
+
+    ImGui::Checkbox("Print points", &this->print_points);
 }
 
 void Voronoi::render()
@@ -186,5 +218,6 @@ void Voronoi::render()
              static_cast<float>(this->win.getSize().y) });
         this->win.draw(sprite);
     }
-    this->win.draw(this->point_vertices);
+    if (this->print_points)
+        this->win.draw(this->point_vertices);
 }

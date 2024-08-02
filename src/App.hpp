@@ -23,6 +23,7 @@ private:
     sf::Time dt;
 
     bool use_gpu = true;
+    Voronoi::DistanceType distance_type = Voronoi::DistanceType::Euclidean;
     
     void setupWin();
     void setupGui();

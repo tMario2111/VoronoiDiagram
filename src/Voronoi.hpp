@@ -12,7 +12,14 @@ constexpr unsigned int POINT_COUNT = 800;
 class Voronoi
 {
 public:
-    Voronoi(sf::RenderWindow& win, bool use_gpu);
+    enum DistanceType
+    {
+        Euclidean,
+        Manhattan,
+        Chebyshev,
+    };
+
+    Voronoi(sf::RenderWindow& win, bool use_gpu, DistanceType distance_type);
     ~Voronoi();
 
     void update(sf::Time dt);
@@ -21,6 +28,10 @@ public:
 private:
     sf::RenderWindow& win;
     const bool use_gpu;
+
+    const DistanceType distance_type;
+
+    bool print_points = true;
 
     struct Point
     {
@@ -39,7 +50,9 @@ private:
     std::vector<std::thread> threads;
     std::vector<bool> finished;
 
-    sf::Time render_time = sf::Time::Zero;
+    sf::Clock render_clock;
+    sf::Time render_time;
+    bool time_set = false;
 
     sf::RenderTexture render_texture;
     sf::RenderTexture present_texture;
@@ -47,6 +60,8 @@ private:
     sf::Sprite sprite;
 
     float squaredDistance(const sf::Vector2f a, const sf::Vector2f b);
+    float manhattanDistance(const sf::Vector2f a, const sf::Vector2f b);
+    float chebyshevDistance(const sf::Vector2f a, const sf::Vector2f b);
 
     void setupRandom();
     void setupPoints();
